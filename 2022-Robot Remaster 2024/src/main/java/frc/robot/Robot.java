@@ -6,14 +6,12 @@
 
 package frc.robot;
 
-import javax.lang.model.util.ElementScanner14;
-
+//import javax.lang.model.util.ElementScanner14;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.hardware.TalonFX;
-
 import edu.wpi.first.cameraserver.CameraServer;
-import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.wpilibj.DutyCycleEncoder;
+//import edu.wpi.first.math.controller.PIDController;
+//import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -32,6 +30,8 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  */
 public class Robot extends TimedRobot {
   private static final String NoAutoSelected = "No Auto Selected";
+  private static final String ShootDontMove = "Shoot and Don't Move";
+  private static final String ShootCrossLine = "Shoot and Cross Line ";
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
@@ -41,17 +41,20 @@ public class Robot extends TimedRobot {
    */
 
   //Motors
-  private final PWMVictorSPX frontLeftMotor = new PWMVictorSPX(1);
-  private final PWMVictorSPX backLeftMotor = new PWMVictorSPX(2);
-  private final PWMVictorSPX frontRightMotor = new PWMVictorSPX(1);
-  private final PWMVictorSPX backRightMotor = new PWMVictorSPX(2); 
+  private final PWMVictorSPX LeftMotor = new PWMVictorSPX(1);
+  private final PWMVictorSPX RightMotor = new PWMVictorSPX(2);
+  //private final PWMVictorSPX frontLeftMotor = new PWMVictorSPX(1);
+  //private final PWMVictorSPX backLeftMotor = new PWMVictorSPX(7);
+  //private final PWMVictorSPX frontRightMotor = new PWMVictorSPX(2);
+  //private final PWMVictorSPX backRightMotor = new PWMVictorSPX(8); 
   private final PWMVictorSPX pivotMotor = new PWMVictorSPX(3);
   private final PWMVictorSPX intakeMotor = new PWMVictorSPX(4);
   private final PWMVictorSPX stagingMotor = new PWMVictorSPX(5);
+  private final PWMVictorSPX exitMotor = new PWMVictorSPX(6);
+  
   private final TalonFX leftshootMotor = new TalonFX(1);
   private final TalonFX rightshootMotor = new TalonFX(2);
-  private final PWMVictorSPX exitMotor = new PWMVictorSPX(6);
-
+  
 
   private DifferentialDrive m_drive;
 
@@ -79,14 +82,6 @@ public class Robot extends TimedRobot {
     intakeMotor.set(0);
   }
 
-  //SHOOTER
-  public void setShooterSpeed(double speed){
-    leftshootMotor.set(speed);
-  }
-  public void stopShooter(){
-    leftshootMotor.set(0);
-  }
-
   //STAGING
   public void setStagingSpeed(double speed){
     stagingMotor.set(speed);
@@ -95,12 +90,49 @@ public class Robot extends TimedRobot {
     stagingMotor.set(0);
   }
 
-  //EXIT MOTOR
-  public void setExitMotor(double speed){
+  //SHOOTER
+  public void setShooterSpeed(double speed){
+    leftshootMotor.set(speed);
+  }
+  public void stopShooter(){
+    leftshootMotor.set(0);
+  }
+
+  //SHOOTER EXIT
+  public void setExitSpeed(double speed){
     exitMotor.set(speed);  
   }
-  public void stopExitMotor(){
+  public void stopExit(){
     exitMotor.set(0);
+  }
+
+  public void ShootAndCrossLine(){
+    if (autoTimer.get() > 9){
+      m_drive.tankDrive(0, 0);
+    } else if (autoTimer.get() > 5){
+      stopShooter();
+      stopStaging();
+      stopExit();
+      m_drive.tankDrive(.6, .6);
+    } else if (autoTimer.get() > 2){
+      setStagingSpeed(.5);
+    } else if (autoTimer.get() > 0){
+      setShooterSpeed(.5);
+      setExitSpeed(.75);
+    }
+   }
+
+  public void ShootAndDoNotMove(){
+    if (autoTimer.get() > 5){
+      stopShooter();
+      stopStaging();
+      stopExit();
+    } else if (autoTimer.get() > 2){
+      setStagingSpeed(.5);
+    } else if (autoTimer.get() > 0){
+      setShooterSpeed(.9);
+      setExitSpeed(.75);
+    }
   }
 
   @Override
@@ -108,30 +140,34 @@ public class Robot extends TimedRobot {
     m_chooser.setDefaultOption(NoAutoSelected, NoAutoSelected);
     //m_chooser.addOption(ShootDontMove, ShootDontMove);
     //m_chooser.addOption(ShootCrossLine, ShootCrossLine);
-    //m_chooser.addOption(BlueShortShootCrossLine, BlueShortShootCrossLine);
-    //m_chooser.addOption(RedShortShootCrossLine, RedShortShootCrossLine);
     SmartDashboard.putData("Auto Chooser", m_chooser);
     //Camera
     CameraServer.startAutomaticCapture();
 
     //DRIVE
-    frontRightMotor.setInverted(true);
-    frontLeftMotor.addFollower(backLeftMotor);
-    frontRightMotor.addFollower(backRightMotor);
-    m_drive = new DifferentialDrive(frontLeftMotor, frontRightMotor);
+    //frontRightMotor.setInverted(true);
+    //frontLeftMotor.addFollower(backLeftMotor);
+    //frontRightMotor.addFollower(backRightMotor);
+    //m_drive = new DifferentialDrive(frontLeftMotor, frontRightMotor);
+
+    LeftMotor.setInverted(true);
+    m_drive = new DifferentialDrive(LeftMotor, RightMotor);
+
+    //PIVOT
+    pivotMotor.setInverted(true);
 
     //INTAKE
-    intakeMotor.setInverted(false);
+    intakeMotor.setInverted(true);
+
+    //STAGING
+    stagingMotor.setInverted(false);
 
     //SHOOTER
     leftshootMotor.setInverted(false);
     rightshootMotor.setControl(new Follower(1, true));
 
-    //STAGING
-    stagingMotor.setInverted(false);
-
     //EXIT SHOOTER
-    exitMotor.setInverted(false);
+    exitMotor.setInverted(true);
   }
 
   /**
@@ -169,14 +205,17 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     switch (m_autoSelected) {
-      //case ShootDontMove:
-      //  ShootAndDoNotMove();
-      //  break,
-      //case NoAutoSelected:
-      //  //System.out.println("buwomp");
-      //  break;
-      //default:
-      //  break;
+      case ShootDontMove:
+        ShootAndDoNotMove();
+        break;
+      case ShootCrossLine:
+        ShootAndCrossLine();
+        break;
+      case NoAutoSelected:
+        //System.out.println("buwomp");
+        break;
+      default:
+        break;
       
     }
   }
@@ -210,29 +249,35 @@ public class Robot extends TimedRobot {
       stopIntake();
     }
 
-    //SHOOTER
+    //STAGING
     if (xbox.getAButton()){
-      setShooterSpeed(.75);
+      setShooterSpeed(.5);
     } else if (xbox.getBButton()){
-      setShooterSpeed(-.5);
+      setShooterSpeed(-.4);
+    }  else {
+      stopStaging();
+      }
+
+    //SHOOTER
+    if (xbox.getXButton()){
+      setShooterSpeed(.50);
+    } else if (xbox.getYButton()){
+      setShooterSpeed(-.3);
     } else if (xbox.getStartButton()){
       setShooterSpeed(.90);
     } else if (xbox.getBackButton()){
-      setShooterSpeed(.50);
+      setShooterSpeed(.70);
     } else {
      stopShooter();
      stopShooter();
     }
 
-    //STAGING
+    //EXIT SHOOTER
     if (xbox.getXButton()){
-      setShooterSpeed(.5);
-    } else if (xbox.getYButton()){
-      setShooterSpeed(-.5);
-    }  else {
-      stopStaging();
-      stopStaging();
-      }
+      setExitSpeed(.75);
+    } else {
+     stopExit();
+    }
   }
 
   /** This function is called once when the robot is disabled. */
