@@ -6,12 +6,15 @@
 
 package frc.robot;
 
-//import javax.lang.model.util.ElementScanner14;
+import javax.lang.model.util.ElementScanner14;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.hardware.TalonFX;
+
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.cameraserver.CameraServer;
-//import edu.wpi.first.math.controller.PIDController;
-//import edu.wpi.first.wpilibj.DutyCycleEncoder;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -20,6 +23,10 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 
 
 /**
@@ -54,7 +61,9 @@ public class Robot extends TimedRobot {
   
   private final TalonFX leftshootMotor = new TalonFX(1);
   private final TalonFX rightshootMotor = new TalonFX(2);
-  
+
+  private final DutyCycleEncoder pivotEncoder = new DutyCycleEncoder(0);
+  private final PIDController pivotPID = new PIDController(.1, 0, 0);
 
   private DifferentialDrive m_drive;
 
@@ -72,6 +81,17 @@ public class Robot extends TimedRobot {
   }
   public void stopPivot(){
     pivotMotor.set(0);
+  }
+  public void setPivotToAngle(double setpoint){
+    // pivotPID.calculate(getPivotEncoderAngle(), setpoint)
+    double pivotCommanded = setpoint > 0 ? Math.min(.1, pivotPID.calculate(getPivotEncoderAngle(), setpoint)) : Math.max(-.1, pivotPID.calculate(getPivotEncoderAngle(), setpoint));
+    setPivotSpeed(pivotCommanded);
+  }
+  public double getPivotEncoderAngle(){
+    return -pivotEncoder.getDistance();
+  }
+  public void resetPivotEncoder(){
+    pivotEncoder.reset();
   }
 
   //INTAKE
@@ -155,6 +175,8 @@ public class Robot extends TimedRobot {
 
     //PIVOT
     pivotMotor.setInverted(true);
+    //pivotMotor.setIdleMode(IdleMode.kBrake);
+    SmartDashboard.putData("Reset Pivot Encoder", new InstantCommand(() -> resetPivotEncoder()).ignoringDisable(true));
 
     //INTAKE
     intakeMotor.setInverted(true);
@@ -179,7 +201,10 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    
+    SmartDashboard.putNumber("Pivot Encoder Angle", getPivotEncoderAngle());
+    //SmartDashboard.putNumber("Pivot Motor Output", pivotMotor.getAppliedOutput());
+    double shootSpeed = (leftshootMotor.getVelocity().refresh().getValueAsDouble() * 60 + rightshootMotor.getVelocity().refresh().getValueAsDouble() * 60) / 2;
+    SmartDashboard.putNumber("Shooter Speed", shootSpeed);
   }
 
   /**
@@ -231,13 +256,13 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
     //DRIVE
-    m_drive.arcadeDrive(leftstick.getY(), -rightstick.getX());
+    m_drive.arcadeDrive(leftstick.getY(), rightstick.getX());
 
     //PIVOT
-    if (xbox.getYButton()){
-    setPivotSpeed(xbox.getLeftY()*.45);
+    if (leftstick.getRawButton(9)){
+      setPivotToAngle(.3);
     } else {
-      stopPivot();
+      setPivotSpeed(xbox.getLeftY()*.40);
     }
 
     //INTAKE
@@ -251,9 +276,9 @@ public class Robot extends TimedRobot {
 
     //STAGING
     if (xbox.getAButton()){
-      setShooterSpeed(.5);
+      setStagingSpeed(.5);
     } else if (xbox.getBButton()){
-      setShooterSpeed(-.4);
+      setStagingSpeed(-.4);
     }  else {
       stopStaging();
       }
@@ -265,8 +290,8 @@ public class Robot extends TimedRobot {
       setShooterSpeed(-.3);
     } else if (xbox.getStartButton()){
       setShooterSpeed(.90);
-    } else if (xbox.getBackButton()){
-      setShooterSpeed(.70);
+    } else if(xbox.getBackButton()){
+      setShooterSpeed(.25);
     } else {
      stopShooter();
      stopShooter();
