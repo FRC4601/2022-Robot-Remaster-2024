@@ -6,15 +6,13 @@
 
 package frc.robot;
 
-import javax.lang.model.util.ElementScanner14;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.hardware.TalonFX;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.wpilibj.DutyCycleEncoder;
+import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.cameraserver.CameraServer;
-import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -23,10 +21,6 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
-import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import edu.wpi.first.wpilibj2.command.WaitCommand;
 
 
 /**
@@ -50,10 +44,6 @@ public class Robot extends TimedRobot {
   //Motors
   private final PWMVictorSPX LeftMotor = new PWMVictorSPX(1);
   private final PWMVictorSPX RightMotor = new PWMVictorSPX(2);
-  //private final PWMVictorSPX frontLeftMotor = new PWMVictorSPX(1);
-  //private final PWMVictorSPX backLeftMotor = new PWMVictorSPX(7);
-  //private final PWMVictorSPX frontRightMotor = new PWMVictorSPX(2);
-  //private final PWMVictorSPX backRightMotor = new PWMVictorSPX(8); 
   private final PWMVictorSPX pivotMotor = new PWMVictorSPX(3);
   private final PWMVictorSPX intakeMotor = new PWMVictorSPX(4);
   private final PWMVictorSPX stagingMotor = new PWMVictorSPX(5);
@@ -62,17 +52,19 @@ public class Robot extends TimedRobot {
   private final TalonFX leftshootMotor = new TalonFX(1);
   private final TalonFX rightshootMotor = new TalonFX(2);
 
-  private final DutyCycleEncoder pivotEncoder = new DutyCycleEncoder(0);
-  private final PIDController pivotPID = new PIDController(.1, 0, 0);
+  //private final DutyCycleEncoder pivotEncoder = new DutyCycleEncoder(0);
+  private final PIDController pivotPID = new PIDController(.005, 0, 0);
+  private final Encoder armEncoder = new Encoder(0, 1);
 
   private DifferentialDrive m_drive;
 
   //Controls
-  private final Joystick rightstick = new Joystick(0);
-  private final Joystick leftstick = new Joystick(1);
+  private final Joystick leftstick = new Joystick(0);
+  private final Joystick rightstick = new Joystick(1);
   private final XboxController xbox = new XboxController(2);
 
   private final Timer autoTimer = new Timer();
+  private final Timer teleTimer = new Timer();
 
   //FUNCTIONS
   //PIVOT
@@ -81,17 +73,6 @@ public class Robot extends TimedRobot {
   }
   public void stopPivot(){
     pivotMotor.set(0);
-  }
-  public void setPivotToAngle(double setpoint){
-    // pivotPID.calculate(getPivotEncoderAngle(), setpoint)
-    double pivotCommanded = setpoint > 0 ? Math.min(.1, pivotPID.calculate(getPivotEncoderAngle(), setpoint)) : Math.max(-.1, pivotPID.calculate(getPivotEncoderAngle(), setpoint));
-    setPivotSpeed(pivotCommanded);
-  }
-  public double getPivotEncoderAngle(){
-    return -pivotEncoder.getDistance();
-  }
-  public void resetPivotEncoder(){
-    pivotEncoder.reset();
   }
 
   //INTAKE
@@ -150,7 +131,7 @@ public class Robot extends TimedRobot {
     } else if (autoTimer.get() > 2){
       setStagingSpeed(.5);
     } else if (autoTimer.get() > 0){
-      setShooterSpeed(.9);
+      setShooterSpeed(.5);
       setExitSpeed(.75);
     }
   }
@@ -158,25 +139,23 @@ public class Robot extends TimedRobot {
   @Override
   public void robotInit() {
     m_chooser.setDefaultOption(NoAutoSelected, NoAutoSelected);
-    //m_chooser.addOption(ShootDontMove, ShootDontMove);
-    //m_chooser.addOption(ShootCrossLine, ShootCrossLine);
+    m_chooser.addOption(ShootDontMove, ShootDontMove);
+    m_chooser.addOption(ShootCrossLine, ShootCrossLine);
     SmartDashboard.putData("Auto Chooser", m_chooser);
     //Camera
     CameraServer.startAutomaticCapture();
 
     //DRIVE
-    //frontRightMotor.setInverted(true);
-    //frontLeftMotor.addFollower(backLeftMotor);
-    //frontRightMotor.addFollower(backRightMotor);
-    //m_drive = new DifferentialDrive(frontLeftMotor, frontRightMotor);
-
     LeftMotor.setInverted(true);
     m_drive = new DifferentialDrive(LeftMotor, RightMotor);
 
     //PIVOT
     pivotMotor.setInverted(true);
-    //pivotMotor.setIdleMode(IdleMode.kBrake);
-    SmartDashboard.putData("Reset Pivot Encoder", new InstantCommand(() -> resetPivotEncoder()).ignoringDisable(true));
+
+    //ENCODER
+    armEncoder.setDistancePerPulse(360/8192);
+    armEncoder.setMinRate(10);
+    armEncoder.setReverseDirection(true);
 
     //INTAKE
     intakeMotor.setInverted(true);
@@ -201,8 +180,6 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    SmartDashboard.putNumber("Pivot Encoder Angle", getPivotEncoderAngle());
-    //SmartDashboard.putNumber("Pivot Motor Output", pivotMotor.getAppliedOutput());
     double shootSpeed = (leftshootMotor.getVelocity().refresh().getValueAsDouble() * 60 + rightshootMotor.getVelocity().refresh().getValueAsDouble() * 60) / 2;
     SmartDashboard.putNumber("Shooter Speed", shootSpeed);
   }
@@ -250,19 +227,48 @@ public class Robot extends TimedRobot {
   public void teleopInit() {
     autoTimer.stop();
     autoTimer.reset();
+    teleTimer.reset();
+    teleTimer.start();
   }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    //DRIVE
-    m_drive.arcadeDrive(leftstick.getY(), rightstick.getX());
 
-    //PIVOT
-    if (leftstick.getRawButton(9)){
-      setPivotToAngle(.3);
-    } else {
-      setPivotSpeed(xbox.getLeftY()*.40);
+    //ENCODER
+    SmartDashboard.putNumber("Pivot Encoder Angle", armEncoder.getRaw());
+
+
+    //DRIVE
+    m_drive.arcadeDrive(rightstick.getY(), rightstick.getX());
+
+    //PIVOT - OLD PIVOT CODE BEFORE PID WAS ADDED
+    // if (leftstick.getRawButton(9)){
+    //   setPivotSpeed(0);
+    // } else {
+    //   setPivotSpeed(xbox.getLeftY()*.40);
+    // }
+
+    //PIVOT - NEW PIVOT WITH PID
+    if(xbox.getLeftY() >=0.5){  //Arm going up
+      if(armEncoder.getRaw() > 1000){
+        pivotMotor.set(0.25);
+      } else if (armEncoder.getRaw() < 1000){
+        pivotMotor.set(0);
+      }
+    } else if(xbox.getLeftY() <=-0.5){ //Arm going down
+      if(armEncoder.getRaw() < 1400){
+        pivotMotor.set(-0.25);
+      } else if (armEncoder.getRaw() > 1400){
+        pivotMotor.set(0);
+      } pivotPID.setSetpoint(armEncoder.getRaw());
+    }  else { // PID
+      if(armEncoder.getRaw() > 1000){
+        pivotMotor.set(-1*MathUtil.clamp(pivotPID.calculate(armEncoder.getRaw()),-1.0,1.0));
+        //pivotMotor.set(0);
+      } else {
+        pivotMotor.set(0);
+      }
     }
 
     //INTAKE
@@ -300,7 +306,10 @@ public class Robot extends TimedRobot {
     //EXIT SHOOTER
     if (xbox.getXButton()){
       setExitSpeed(.75);
+    } else if (xbox.getStartButton()){
+      setExitSpeed(.75);
     } else {
+     stopExit();
      stopExit();
     }
   }
