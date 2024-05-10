@@ -1,4 +1,4 @@
-//CB-9 "Vengence" Remaster
+//CB-9 "VENGENCE" REMASTER
 
 // Copyright (c) FIRST and other WPILib contributors.
 // Open Source Software; you can modify and/or share it under the terms of
@@ -56,6 +56,7 @@ public class Robot extends TimedRobot {
   private final PIDController pivotPID = new PIDController(.005, 0, 0);
   private final Encoder armEncoder = new Encoder(0, 1);
 
+  //Drivetrain
   private DifferentialDrive m_drive;
 
   //Controls
@@ -63,6 +64,7 @@ public class Robot extends TimedRobot {
   private final Joystick rightstick = new Joystick(1);
   private final XboxController xbox = new XboxController(2);
 
+  //Timers
   private final Timer autoTimer = new Timer();
   private final Timer teleTimer = new Timer();
 
@@ -107,6 +109,7 @@ public class Robot extends TimedRobot {
     exitMotor.set(0);
   }
 
+  //Auto #1
   public void ShootAndCrossLine(){
     if (autoTimer.get() > 9){
       m_drive.tankDrive(0, 0);
@@ -123,6 +126,7 @@ public class Robot extends TimedRobot {
     }
    }
 
+  //Auto #2
   public void ShootAndDoNotMove(){
     if (autoTimer.get() > 5){
       stopShooter();
@@ -138,10 +142,13 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotInit() {
+    
+    //Auto Choosers
     m_chooser.setDefaultOption(NoAutoSelected, NoAutoSelected);
     m_chooser.addOption(ShootDontMove, ShootDontMove);
     m_chooser.addOption(ShootCrossLine, ShootCrossLine);
     SmartDashboard.putData("Auto Chooser", m_chooser);
+
     //Camera
     CameraServer.startAutomaticCapture();
 
@@ -196,9 +203,12 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void autonomousInit() {
+    
+    //Auto Chooser
     m_autoSelected = m_chooser.getSelected();
     System.out.println("Auto selected: " + m_autoSelected);
 
+    //Auto Timer
     autoTimer.reset();
     autoTimer.start();
   }
@@ -225,8 +235,12 @@ public class Robot extends TimedRobot {
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
+    
+    //Auto Timer
     autoTimer.stop();
     autoTimer.reset();
+    
+    //Tele Timer
     teleTimer.reset();
     teleTimer.start();
   }
@@ -237,7 +251,6 @@ public class Robot extends TimedRobot {
 
     //ENCODER
     SmartDashboard.putNumber("Pivot Encoder Angle", armEncoder.getRaw());
-
 
     //DRIVE
     m_drive.arcadeDrive(rightstick.getY(), rightstick.getX());
@@ -263,7 +276,7 @@ public class Robot extends TimedRobot {
         pivotMotor.set(0);
       } pivotPID.setSetpoint(armEncoder.getRaw());
     }  else { // PID
-      if(armEncoder.getRaw() > 1000){
+      if(armEncoder.getRaw() > 1000){ //PID for Arm
         pivotMotor.set(-1*MathUtil.clamp(pivotPID.calculate(armEncoder.getRaw()),-1.0,1.0));
         //pivotMotor.set(0);
       } else {
@@ -272,31 +285,31 @@ public class Robot extends TimedRobot {
     }
 
     //INTAKE
-    if (xbox.getRightBumper()){
+    if (xbox.getRightBumper()){ //Intakes Ball
       setIntakeSpeed(.5);
-    } else if (xbox.getLeftBumper()){
+    } else if (xbox.getLeftBumper()){ //Ejects Ball
       setIntakeSpeed(-.5);
     } else {
       stopIntake();
     }
 
     //STAGING
-    if (xbox.getAButton()){
+    if (xbox.getAButton()){ //Spins ball into Shooter Wheels
       setStagingSpeed(.5);
-    } else if (xbox.getBButton()){
+    } else if (xbox.getBButton()){ //Ejects ball
       setStagingSpeed(-.4);
     }  else {
       stopStaging();
       }
 
     //SHOOTER
-    if (xbox.getXButton()){
-      setShooterSpeed(.50);
-    } else if (xbox.getYButton()){
+    if (xbox.getXButton()){ //Shoots Ball @ 50% Speed
+      setShooterSpeed(.50); 
+    } else if (xbox.getYButton()){ //Ejects Ball
       setShooterSpeed(-.3);
-    } else if (xbox.getStartButton()){
+    } else if (xbox.getStartButton()){ //Shoots Ball @ 90% Speed
       setShooterSpeed(.90);
-    } else if(xbox.getBackButton()){
+    } else if(xbox.getBackButton()){ //Shoots Ball @ 25% Speed
       setShooterSpeed(.25);
     } else {
      stopShooter();
@@ -304,9 +317,9 @@ public class Robot extends TimedRobot {
     }
 
     //EXIT SHOOTER
-    if (xbox.getXButton()){
+    if (xbox.getXButton()){ //Shoots Ball @ 75% Speed
       setExitSpeed(.75);
-    } else if (xbox.getStartButton()){
+    } else if (xbox.getStartButton()){ //Shoots Ball @ 75% Speed
       setExitSpeed(.75);
     } else {
      stopExit();
